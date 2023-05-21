@@ -8,11 +8,12 @@ describe('TokenManagement', function () {
   let tokenManagement: TokenManagement;
   let owner: Signer;
   let user: Signer;
+  let user2: Signer;
   let token721Contract: NFT_721;
   let tokenId721 = 0;
 
   beforeEach(async function () {
-    [owner, user] = await ethers.getSigners();
+    [owner, user, user2] = await ethers.getSigners();
 
     const TokenManagement = await ethers.getContractFactory('TokenManagement');
     const proxy = await upgrades.deployProxy(TokenManagement);
@@ -73,6 +74,18 @@ describe('TokenManagement', function () {
     // Check if the token is transferred back to the owner
     const tokenOwner = await token721Contract.ownerOf(tokenId721);
     expect(tokenOwner).to.equal(await user.getAddress());
+  });
+
+  it('should not withdrawing ERC721 tokens from another user', async function () {
+    await token721Contract.connect(user).approve(tokenManagement.address, tokenId721);
+    // Deposit ERC721 token
+    await tokenManagement.connect(user).deposit721(token721Contract.address, tokenId721);
+    // Withdraw unlocked ERC721 token
+    await expect(tokenManagement.connect(user2).withdraw721(token721Contract.address, tokenId721)).to.be.revertedWith(
+      'You have not deposited this token'
+    );
+    const tokenOwner = await token721Contract.ownerOf(tokenId721);
+    expect(tokenOwner).to.equal(tokenManagement.address);
   });
 });
 

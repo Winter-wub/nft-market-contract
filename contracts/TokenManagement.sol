@@ -37,6 +37,8 @@ contract TokenManagement is
 
     mapping(address => mapping(uint256 => uint256)) private balances721;
     mapping(address => mapping(uint256 => bool)) private locked721;
+    mapping(address => mapping(address => mapping(uint256 => bool)))
+        private userTokens;
 
     function deposit721(address tokenContract, uint256 tokenId) public {
         IERC721 token = IERC721(tokenContract);
@@ -44,20 +46,42 @@ contract TokenManagement is
         require(owner == msg.sender, "You are not the owner of this token");
         token.safeTransferFrom(msg.sender, address(this), tokenId);
         balances721[tokenContract][tokenId]++;
+        userTokens[msg.sender][tokenContract][tokenId] = true;
     }
 
     function withdraw721(address tokenContract, uint256 tokenId) public {
         IERC721 token = IERC721(tokenContract);
         require(
+            checkWhoDeposit(msg.sender, tokenContract, tokenId),
+            "You have not deposited this token"
+        );
+        require(
             balances721[tokenContract][tokenId] > 0,
             "No balance available for this token"
         );
         require(
-            !locked721[tokenContract][tokenId],
+            isLock(tokenContract, tokenId) == false,
             "This token is locked from withdrawal"
         );
+
         balances721[tokenContract][tokenId]--;
         token.safeTransferFrom(address(this), msg.sender, tokenId);
+        userTokens[msg.sender][tokenContract][tokenId] = false;
+    }
+
+    function isLock(
+        address tokenContractAddress,
+        uint256 tokenID
+    ) public view returns (bool) {
+        return locked721[tokenContractAddress][tokenID];
+    }
+
+    function checkWhoDeposit(
+        address ownerAddress,
+        address contractAddress,
+        uint256 tokenId
+    ) public view returns (bool) {
+        return userTokens[ownerAddress][contractAddress][tokenId];
     }
 
     function lock721(address tokenContract, uint256 tokenId) public onlyOwner {
